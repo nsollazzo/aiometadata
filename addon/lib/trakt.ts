@@ -53,7 +53,7 @@ export class TraktClient {
       params.append('code_challenge_method', 'S256');
     }
 
-    return `https://trakt.tv/oauth/authorize?${params.toString()}`;
+    return `https://auth.trakt.tv/oauth/authorize?${params.toString()}`;
   }
 
   /**
