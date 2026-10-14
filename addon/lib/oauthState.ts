@@ -13,6 +13,7 @@ const MAL_STATE_HMAC_DOMAIN = 'aiometadata:mal-oauth-state:v1';
 const ANILIST_STATE_HMAC_DOMAIN = 'aiometadata:anilist-oauth-state:v1';
 const SIMKL_STATE_HMAC_DOMAIN = 'aiometadata:simkl-oauth-state:v1';
 const MAL_PKCE_VERIFIER_DOMAIN = 'aiometadata:mal-pkce-verifier:v1';
+const TRAKT_PKCE_VERIFIER_DOMAIN = 'aiometadata:trakt-pkce-verifier:v1';
 const SIMKL_V2_STATE_HMAC_DOMAIN = 'aiometadata:simkl-oauth2-state:v1';
 const SIMKL_V2_PKCE_VERIFIER_DOMAIN = 'aiometadata:simkl-pkce-verifier:v1';
 
@@ -143,6 +144,30 @@ export function verifyTraktOAuthState(
   now: number = Date.now()
 ): boolean {
   return verifySignedOAuthState(state, secret, TRAKT_STATE_HMAC_DOMAIN, now) !== null;
+}
+
+// PKCE S256 for a Trakt app that has no client secret. The verifier is derived
+// from the signed state, so it never has to be stored. `secret` is the client
+// id when no client secret exists; the state signature only has to be stable
+// across the redirect, and the client id is.
+export function createTraktOAuthTransaction(
+  secret: string,
+  ttlMs: number,
+  now: number = Date.now()
+): { state: string; codeVerifier: string } {
+  const state = createTraktOAuthState(secret, ttlMs, now);
+  return { state, codeVerifier: deriveCodeVerifier(state, secret, TRAKT_PKCE_VERIFIER_DOMAIN) };
+}
+
+export function verifyTraktOAuthTransaction(
+  state: unknown,
+  secret: string,
+  now: number = Date.now()
+): string | null {
+  const verified = verifySignedOAuthState(state, secret, TRAKT_STATE_HMAC_DOMAIN, now);
+  return verified && typeof state === 'string'
+    ? deriveCodeVerifier(state, secret, TRAKT_PKCE_VERIFIER_DOMAIN)
+    : null;
 }
 
 export function createAniListOAuthState(

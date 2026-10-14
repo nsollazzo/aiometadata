@@ -37,7 +37,7 @@ export class TraktClient {
   /**
    * Get authorization URL for OAuth flow
    */
-  getAuthorizationUrl(state?: string): string {
+  getAuthorizationUrl(state?: string, codeChallenge?: string): string {
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: this.clientId,
@@ -48,21 +48,29 @@ export class TraktClient {
       params.append('state', state);
     }
 
+    if (codeChallenge) {
+      params.append('code_challenge', codeChallenge);
+      params.append('code_challenge_method', 'S256');
+    }
+
     return `https://trakt.tv/oauth/authorize?${params.toString()}`;
   }
 
   /**
    * Exchange authorization code for access token
    */
-  async exchangeCodeForToken(code: string): Promise<TraktTokens> {
+  async exchangeCodeForToken(code: string, codeVerifier?: string): Promise<TraktTokens> {
     try {
-      const response = await httpPost('https://api.trakt.tv/oauth/token', {
+      const body: Record<string, string> = {
         code,
         client_id: this.clientId,
-        client_secret: this.clientSecret,
         redirect_uri: this.redirectUri,
         grant_type: 'authorization_code',
-      }, {
+      };
+      if (this.clientSecret) body.client_secret = this.clientSecret;
+      if (codeVerifier) body.code_verifier = codeVerifier;
+
+      const response = await httpPost('https://api.trakt.tv/oauth/token', body, {
         dispatcher: traktDispatcher,
         headers: {
           'Content-Type': 'application/json',
@@ -98,13 +106,15 @@ export class TraktClient {
    */
   async refreshAccessToken(refreshToken: string): Promise<TraktTokens> {
     try {
-      const response = await httpPost('https://api.trakt.tv/oauth/token', {
+      const body: Record<string, string> = {
         refresh_token: refreshToken,
         client_id: this.clientId,
-        client_secret: this.clientSecret,
         redirect_uri: this.redirectUri,
         grant_type: 'refresh_token',
-      }, {
+      };
+      if (this.clientSecret) body.client_secret = this.clientSecret;
+
+      const response = await httpPost('https://api.trakt.tv/oauth/token', body, {
         dispatcher: traktDispatcher,
         headers: {
           'Content-Type': 'application/json',
@@ -169,7 +179,7 @@ export class TraktClient {
         dispatcher: traktDispatcher,
         token: accessToken,
         client_id: this.clientId,
-        client_secret: this.clientSecret,
+        ...(this.clientSecret ? { client_secret: this.clientSecret } : {}),
       });
     } catch (error) {
       logger.error('Failed to revoke token:', error);
